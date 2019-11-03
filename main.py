@@ -1,67 +1,62 @@
 import numpy as np
-import wave
-import struct
 import matplotlib.pyplot as plt
-import simpleaudio as sa
 import time
-import sounddevice as sd
+import sys
+from scipy.signal import find_peaks, peak_widths
 from scipy.io.wavfile import write
-import soundfile as sf
-import pyaudio
-from scipy.signal import chirp, find_peaks, peak_widths
+import random
+import sounddevice as sd
+import datetime
 
-# inits
-frequency = 1000
-num_samples = 48000
-sampling_rate = 48000.0
-amplitude = 16000
-sine_wave = [
-    np.sin(2 * np.pi * frequency * x / sampling_rate)
-    for x in range(num_samples)
-]
-nframes = num_samples
-comptype = "NONE"
-compname = "not compressed"
-nchannels = 1
-sampwidth = 2
-
-threshold_comp = .5
+fs = 44100  # frequency
+chno = 2  # no of channels
+duration = 2
+f = 440.0 # sine freq
 
 
-def create_wave():
-    wav_file = wave.open("test.wav", 'w')
-    wav_file.setparams((nchannels, sampwidth, int(sampling_rate), nframes,
-                        comptype, compname))
-    for s in sine_wave:
-        wav_file.writeframes(struct.pack('h', int(s * amplitude)))
-
-    plt.title("Original audio wave")
-    plt.xlim(0, 1500)
-    # plt.ylim(0.005, -0.005)
-    plt.plot(sine_wave)
-    plt.savefig("created_wave.png")
-    plt.clf()
+def rem_empty(wave):
+    temp = []
+    for a in wave:
+        if np.sum(a) != 0.0 or np.sum(a) != -0.0:
+            temp.append(a)
+    # print(temp[0])
+    return np.array(temp)
 
 
-def plot_recorded():
-    data, fs = sf.read("record.wav", dtype='float32')
-    plt.title("Original audio wave")
-    plt.plot(data)
-    plt.xlim(0, 1500)
-    plt.ylim(0.005, -0.005)
-    plt.savefig("plotted_from_record.png")
+# p = [[-0., -0.], [-0., -0.], [-0., -0.], [-0.00051845, -0.00051845],
+#      [-0.00040478, -0.00040478], [-0.00033682, -0.00033682]]
+
+# print(rem_empty(p))
 
 
-def record_sound():
+def gen_wave():
+    now = datetime.datetime.now()
+    new_f = f+now.hour%10
+    created_wave = (np.sin(2*np.pi*np.arange(fs*1)*new_f/fs)).astype(np.float32)
+    write('gen.wav', fs, created_wave)
 
-    fs = 48000
-    seconds = 1
-    print('wait for message')
-    time.sleep(4)
-    print('recording')
-    myrecording = sd.rec(int(seconds * amplitude), samplerate=int(sampling_rate), channels=nchannels)
-    sd.wait()
-    write('recorded.wav', fs, myrecording)
+
+# gen_wave()
+
+
+def recorder():
+
+    # time.sleep(.5)
+    print("Play sound")
+
+    recorded = sd.rec(int(duration * fs), samplerate=fs, channels=chno)
+    time.sleep(duration)
+    # with open("wave.txt", "w+") as f:
+    #     f.write(str(recorded))
+    # print(rem_empty(recorded))
+    fin_wave = rem_empty(recorded)
+
+    write('test.wav', fs, fin_wave)
+    return fin_wave
+
+
+# recorder()
+
 
 def wave_peaker(data):
     peaks, _ = find_peaks(data)
@@ -73,6 +68,7 @@ def wave_peaker(data):
     plt.savefig("peakers.png")
     return [peaks, widths_all]
 
+
 # Using a difference threshold and counting q of peaks
 def comparison_fast(data1, data2):
     flag = 0
@@ -82,29 +78,20 @@ def comparison_fast(data1, data2):
     for p in [p1, p2, w1, w2]:
         p = np.array(p)
 
-    peak_sub = p1-p2
-    width_sub = w1-w2
+    peak_sub = p1 - p2
+    width_sub = w1 - w2
 
     # no of peaks
 
     lenp1 = len(p1)
     lenp2 = len(p2)
 
-    if(lenp1>=lenp2+3 and lenp1<=lenp2-3):
+    if (lenp1 >= lenp2 + 3 and lenp1 <= lenp2 - 3):
         flag = 1
     else:
         flag = 0
 
     # difference
 
-    peak_sub = [x<threshold_comp for x in peak_sub]
+    peak_sub = [x < threshold_comp for x in peak_sub]
     # width_sub = [x<threshold_comp for x in width_sub]
-
-
-
-
-
-
-
-
-
